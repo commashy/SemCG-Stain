@@ -67,7 +67,7 @@ Will be updated soon.
 
 ## Results
 
-Below shows the virtual staining results using SemCG-Stain.
+Below shows virtual staining results using SemCG-Stain.
 ![Results of Progressive Knowledge Distillation](assets/results.png)
 
 <!--
