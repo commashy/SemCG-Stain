@@ -46,7 +46,7 @@ class SemCGStainModel(BaseModel):
         #----------------------------------
         # Setup Loss Names & Visuals
         #----------------------------------
-        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'D_B', 'G_B', 'cycle_B', 'tv']
+        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'D_B', 'G_B', 'cycle_B']
         visual_names_A = ['real_A', 'fake_B']
         visual_names_B = ['real_B', 'fake_A']
         if self.isTrain:
@@ -144,8 +144,6 @@ class SemCGStainModel(BaseModel):
             self.criterionCycle = nn.L1Loss().to(self.device)
             self.criterionIdt = nn.L1Loss().to(self.device)
             self.criterionCE = nn.CrossEntropyLoss().to(self.device)
-            self.logsoft=torch.nn.LogSoftmax(dim=1).to(self.device)
-            self.tv_loss = TVLoss().to(self.device)
 
             # Hyperparameters for contrastive loss
             if self.opt.use_clip_contrast:
@@ -162,7 +160,7 @@ class SemCGStainModel(BaseModel):
 
             # Optimizers
             if self.opt.use_clip_contrast:
-                backbone_lr = opt.lr * 0.5 
+                backbone_lr = opt.lr
                 generator_lr = opt.lr
                 discriminator_lr = opt.lr
                 g_params = list(self.netG_A.parameters()) + list(self.netG_B.parameters())
@@ -173,8 +171,8 @@ class SemCGStainModel(BaseModel):
                     {"params": plipA_params, "lr": backbone_lr},
                     {"params": plipB_params, "lr": backbone_lr},
                 ]
-                self.optimizer_G = torch.optim.AdamW(param_groups, betas=(opt.beta1, 0.999))
-                self.optimizer_D = torch.optim.AdamW(
+                self.optimizer_G = torch.optim.Adam(param_groups, betas=(opt.beta1, 0.999))
+                self.optimizer_D = torch.optim.Adam(
                     itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()),
                     lr=discriminator_lr, betas=(opt.beta1, 0.999)
                 )
@@ -183,11 +181,11 @@ class SemCGStainModel(BaseModel):
             else:
                 self.optimizer_G = torch.optim.Adam(
                     itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
-                    lr=opt.lr, betas=(opt.beta1, 0.999)
+                    lr=opt.lr, betas=(opt.beta1, opt.beta2)
                 )
                 self.optimizer_D = torch.optim.Adam(
                     itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()),
-                    lr=opt.lr, betas=(opt.beta1, 0.999)
+                    lr=opt.lr, betas=(opt.beta1, opt.beta2)
                 )
                 self.optimizers.append(self.optimizer_G)
                 self.optimizers.append(self.optimizer_D)
