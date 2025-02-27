@@ -1,5 +1,4 @@
 import torch
-torch.manual_seed(523)
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
@@ -252,33 +251,11 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif netG == 'stylegan2':
-        net = StyleGAN2Generator(input_nc, output_nc, ngf, use_dropout=use_dropout, opt=opt)
-    elif netG == 'smallstylegan2':
-        net = StyleGAN2Generator(input_nc, output_nc, ngf, use_dropout=use_dropout, n_blocks=2, opt=opt)
-    elif netG == 'unet2':
+    elif netG == 'semCG':
         net = CrossUNet(image_channels=3)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids, initialize_weights=('stylegan2' not in netG))
-
-
-def define_F(input_nc, netF, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, no_antialias=False, gpu_ids=[], opt=None):
-    if netF == 'global_pool':
-        net = PoolingF()
-    elif netF == 'reshape':
-        net = ReshapeF()
-    elif netF == 'mapping':
-        net = MappingF(input_nc, gpu_ids=gpu_ids)
-    elif netF == 'sample':
-        net = PatchSampleF(use_mlp=False, init_type=init_type, init_gain=init_gain, gpu_ids=gpu_ids, nc=opt.netF_nc)
-    elif netF == 'mlp_sample':
-        net = PatchSampleF(use_mlp=True, init_type=init_type, init_gain=init_gain, gpu_ids=gpu_ids, nc=opt.netF_nc)
-    elif netF == 'strided_conv':
-        net = StridedConvF(init_type=init_type, init_gain=init_gain, gpu_ids=gpu_ids)
-    else:
-        raise NotImplementedError('projection model name [%s] is not recognized' % netF)
-    return init_net(net, init_type, init_gain, gpu_ids)
 
 
 def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, no_antialias=False, gpu_ids=[], opt=None, num_classes=None):
@@ -320,14 +297,6 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
         net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer, no_antialias=no_antialias,)
     elif netD == 'pixel':     # classify if each pixel is real or fake
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
-    elif netD == 'unet':
-        net = UnetDiscriminator(input_nc, ndf)
-    elif netD == 'stylegan2':
-        net = StyleGAN2Discriminator(input_nc, ndf, n_layers_D, no_antialias=no_antialias, opt=opt)
-    elif netD == 'basic2':
-        net = NLayerDiscriminator2(input_nc, ndf, n_layers=3, norm_layer=norm_layer, no_antialias=no_antialias, num_classes=num_classes)
-    elif netD == 'basic3':
-        net = NLayerDiscriminator3(input_nc, ndf, n_layers=3, num_classes=num_classes)
     elif netD == 'multi':
         net = MultiScaleDiscriminator(input_nc, ndf, num_classes=num_classes)
     else:
@@ -1084,73 +1053,6 @@ class PixelDiscriminator(nn.Module):
         """Standard forward."""
         return self.net(input)
 
-class NLayerDiscriminator2(nn.Module):
-    """Defines a PatchGAN discriminator"""
-
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, no_antialias=False, num_classes=7):
-        """Construct a PatchGAN discriminator
-
-        Parameters:
-            input_nc (int)  -- the number of channels in input images
-            ndf (int)       -- the number of filters in the last conv layer
-            n_layers (int)  -- the number of conv layers in the discriminator
-            norm_layer      -- normalization layer
-        """
-        super(NLayerDiscriminator2, self).__init__()
-        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
-
-        kw = 4
-        padw = 1
-        if(no_antialias):
-            sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
-        else:
-            sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=1, padding=padw), nn.LeakyReLU(0.2, True), Downsample(ndf)]
-        nf_mult = 1
-        nf_mult_prev = 1
-        for n in range(1, n_layers):  # gradually increase the number of filters
-            nf_mult_prev = nf_mult
-            nf_mult = min(2 ** n, 8)
-            if(no_antialias):
-                sequence += [
-                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
-                    norm_layer(ndf * nf_mult),
-                    nn.LeakyReLU(0.2, True)
-                ]
-            else:
-                sequence += [
-                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
-                    norm_layer(ndf * nf_mult),
-                    nn.LeakyReLU(0.2, True),
-                    Downsample(ndf * nf_mult)]
-
-        nf_mult_prev = nf_mult
-        nf_mult = min(2 ** n_layers, 8)
-        sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
-            norm_layer(ndf * nf_mult),
-            nn.LeakyReLU(0.2, True)
-        ]
-
-        # sequence += [nn.Conv2d(ndf * nf_mult, num_classes, kernel_size=kw, stride=1, padding=padw)]
-        self.model = nn.Sequential(*sequence)
-
-        ####
-        self.global_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(ndf * nf_mult, num_classes)
-
-    def forward(self, input):
-        """Standard forward."""
-        x = self.model(input)
-
-        x = self.global_pool(x)  # Shape: (N, ndf * nf_mult, 1, 1)
-        x = x.view(x.size(0), -1)  # Shape: (N, ndf * nf_mult)
-        output = self.fc(x)  # Shape: (N, num_classes)
-
-        return output
-
 
 class PixelDiscriminator(nn.Module):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
@@ -1199,65 +1101,14 @@ class PatchDiscriminator(NLayerDiscriminator):
         input = input.permute(0, 2, 4, 1, 3, 5).contiguous().view(B * Y * X, C, size, size)
         return super().forward(input)
 
-
-class UnetDiscriminator(nn.Module):
-    """Defines a U-Net discriminator with spectral normalization (SN)
-
-    Arg:
-        input_shape: Shape of the input.
-        num_feat (int): Channel number of base intermediate features. Default: 64.
-        skip_connection (bool): Whether to use skip connections between U-Net. Default: True.
-    """
-
-    def __init__(self, num_in_ch, num_feat=64, skip_connection=True):
-        super(UnetDiscriminator, self).__init__()
-        self.skip_connection = skip_connection
-        norm = nn.utils.parametrizations.spectral_norm
-        # the first convolution
-        self.conv0 = nn.Conv2d(num_in_ch, num_feat, kernel_size=3, stride=1, padding=1)
-        # downsample
-        self.conv1 = norm(nn.Conv2d(num_feat, num_feat * 2, 4, 2, 1, bias=False))
-        self.conv2 = norm(nn.Conv2d(num_feat * 2, num_feat * 4, 4, 2, 1, bias=False))
-        self.conv3 = norm(nn.Conv2d(num_feat * 4, num_feat * 8, 4, 2, 1, bias=False))
-        # upsample
-        self.conv4 = norm(nn.Conv2d(num_feat * 8, num_feat * 4, 3, 1, 1, bias=False))
-        self.conv5 = norm(nn.Conv2d(num_feat * 4, num_feat * 2, 3, 1, 1, bias=False))
-        self.conv6 = norm(nn.Conv2d(num_feat * 2, num_feat, 3, 1, 1, bias=False))
-        # extra convolutions
-        self.conv7 = norm(nn.Conv2d(num_feat, num_feat, 3, 1, 1, bias=False))
-        self.conv8 = norm(nn.Conv2d(num_feat, num_feat, 3, 1, 1, bias=False))
-        self.conv9 = nn.Conv2d(num_feat, 1, 3, 1, 1)
-
-    def forward(self, x):
-        # downsample
-        x0 = F.leaky_relu(self.conv0(x), negative_slope=0.2, inplace=True)
-        x1 = F.leaky_relu(self.conv1(x0), negative_slope=0.2, inplace=True)
-        x2 = F.leaky_relu(self.conv2(x1), negative_slope=0.2, inplace=True)
-        x3 = F.leaky_relu(self.conv3(x2), negative_slope=0.2, inplace=True)
-
-        # upsample
-        x3 = F.interpolate(x3, scale_factor=2, mode='bilinear', align_corners=False)
-        x4 = F.leaky_relu(self.conv4(x3), negative_slope=0.2, inplace=True)
-
-        if self.skip_connection:
-            x4 = x4 + x2
-        x4 = F.interpolate(x4, scale_factor=2, mode='bilinear', align_corners=False)
-        x5 = F.leaky_relu(self.conv5(x4), negative_slope=0.2, inplace=True)
-
-        if self.skip_connection:
-            x5 = x5 + x1
-        x5 = F.interpolate(x5, scale_factor=2, mode='bilinear', align_corners=False)
-        x6 = F.leaky_relu(self.conv6(x5), negative_slope=0.2, inplace=True)
-
-        if self.skip_connection:
-            x6 = x6 + x0
-
-        # extra convolutions
-        out = F.leaky_relu(self.conv7(x6), negative_slope=0.2, inplace=True)
-        out = F.leaky_relu(self.conv8(out), negative_slope=0.2, inplace=True)
-        out = self.conv9(out)
-
-        return out
+###############################################################################
+# SemCG-Stain Networks
+###############################################################################
+import math
+import torch
+import torch.nn.functional as F
+from torch import nn
+from typing import Optional, Any
 
 class UpSample(nn.Module):
     def __init__(self, channels: int):
@@ -1307,12 +1158,6 @@ class UpSampleAA(nn.Module):
         )
     def forward(self, x):
         return self.up(x)
-
-import math
-import torch
-import torch.nn.functional as F
-from torch import nn
-from typing import Optional, Any
 
 # Attempt to import xformers
 try:
@@ -1666,7 +1511,6 @@ class CrossUNet(nn.Module):
 
             # Store skip AFTER these blocks. Then if not last scale, downsample
             if i < self.num_scales - 1:
-                # down_modules.append(DownsampleAA(in_ch))
                 down_modules.append(DownSample(in_ch))
 
         self.down = nn.ModuleList(down_modules)
@@ -1713,7 +1557,6 @@ class CrossUNet(nn.Module):
 
             # Upsample if not the top scale
             if i > 0:
-                # up_modules.append(UpSampleAA(in_ch))
                 up_modules.append(UpSample(in_ch))
 
         self.up = nn.ModuleList(up_modules)
@@ -1882,7 +1725,7 @@ class NLayerDiscriminator3(nn.Module):
             self.map1 = nn.Sequential(*map1) # prediction map
             self.global_pool = nn.AdaptiveAvgPool2d(1)
             self.fc = spectral_norm(nn.Linear(dim, num_classes))
-            # self.map1 = nn.Conv2d(dim, num_classes, kernel_size=kw, stride=1, padding=padw) # prediction map
+
             self.map2 = spectral_norm(nn.Conv2d(dim, 1, kernel_size=kw, stride=1, padding=padw)) # real/fake map
 
     def forward(self, input):
