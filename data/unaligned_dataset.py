@@ -3,7 +3,6 @@ from data.base_dataset import BaseDataset, get_transform
 from data.image_folder import make_dataset
 from PIL import Image
 import random
-random.seed(523)
 import util.util as util
 
 
@@ -100,32 +99,19 @@ class UnalignedDataset(BaseDataset):
         class_id_str = filename.split('_')[1]
         # Mapping of class identifiers
         class_mapping = {
-            'l1': 0, # normal samples
-            'l2': 0,
-            '05': 1, # acinar samples
-            'y2': 1,
-            '24': 2, # papillary samples
-            '54': 2,
-            '33': 3, # solid samples
-            '53': 3,
-            'y3': 4, # Lepidic, Acinar, Fibrosis sample
-            's1': 5, # Lepidic samples
-            '06': 6, # Micro-papillary samples
-            '52': 7, # Acinar, Micro-papillary, Lepidic
+            'sample00': 0, # normal samples
+            'sample01': 0,
+            'sample02': 1, # acinar samples
+            'sample03': 1,
+            'sample04': 2, # papillary samples
+            'sample05': 2,
+            'sample06': 3, # solid samples
+            'sample07': 3,
+            'sample08': 4, # Lepidic, Acinar, Fibrosis sample
+            'sample09': 5, # Lepidic samples
+            'sample10': 6, # Micro-papillary samples
+            'sample11': 7, # Acinar, Micro-papillary, Lepidic
         }
-        # class_mapping = {
-        #     'l1': 0, 
-        #     'l2': 0,
-        #     's1': 1,
-        #     'y2': 2,
-        #     'y3': 3,
-        #     '05': 4, 
-        #     '06': 5, 
-        #     '24': 6, 
-        #     '33': 7,
-        #     '52': 8, 
-        #     '54': 9,
-        # }
         # Add your actual mappings for all classes
         class_label = class_mapping.get(class_id_str, -1)
 
