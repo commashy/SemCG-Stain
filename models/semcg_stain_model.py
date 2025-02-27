@@ -11,27 +11,9 @@ from transformers import CLIPProcessor, CLIPModel
 
 from util.image_pool import ImagePool
 from .base_model import BaseModel
-from . import networks10 as networks
+from . import networks_SemCG as networks
 
-class TVLoss(nn.Module):
-    def __init__(self,TVLoss_weight=0.01):
-        super(TVLoss,self).__init__()
-        self.TVLoss_weight = TVLoss_weight
-
-    def forward(self,x):
-        batch_size = x.size()[0]
-        h_x = x.size()[2]
-        w_x = x.size()[3]
-        count_h = self._tensor_size(x[:,:,1:,:])
-        count_w = self._tensor_size(x[:,:,:,1:])
-        h_tv = torch.pow((x[:,:,1:,:]-x[:,:,:h_x-1,:]),2).sum()
-        w_tv = torch.pow((x[:,:,:,1:]-x[:,:,:,:w_x-1]),2).sum()
-        return self.TVLoss_weight*2*torch.sqrt(h_tv/count_h+w_tv/count_w)/batch_size
-
-    def _tensor_size(self,t):
-        return t.size()[1]*t.size()[2]*t.size()[3]
-
-class PccycleGANModel(BaseModel):
+class SemCGStainModel(BaseModel):
     @staticmethod
     def modify_commandline_options(parser, is_train=True):
         parser.set_defaults(no_dropout=True)
@@ -120,12 +102,6 @@ class PccycleGANModel(BaseModel):
                 else:
                     param.requires_grad = False
 
-            # for name, param in self.netPLIP_B.named_parameters():
-            #     if ("vision_model.encoder.layers.10" in name or 
-            #         "vision_model.encoder.layers.11" in name):
-            #         param.requires_grad = True
-            #     else:
-            #         param.requires_grad = False
             for param in self.netPLIP_B.parameters():
                 param.requires_grad = False
 
@@ -308,18 +284,10 @@ class PccycleGANModel(BaseModel):
         if self.opt.use_clip_contrast:
             images_real_B = self.unnormalize_image(self.real_B)
             input_real_B = self.process_image(images_real_B)
-            # input_real_B = self.processor_B(
-            #     images=[img.cpu() for img in images_real_B],
-            #     return_tensors="pt"
-            #     ).to(self.device)
             self.embeddings_real_B = self.netPLIP_B.get_image_features(**input_real_B)
 
             images_real_A = self.unnormalize_image(self.real_A)
             inputs_real_A = self.process_image(images_real_A)
-            # inputs_real_A = self.processor_A(
-            #     images=[img.cpu() for img in images_real_A],
-            #     return_tensors="pt"
-            #     ).to(self.device)
             self.embeddings_real_A = self.netPLIP_A.get_image_features(**inputs_real_A)
 
         if self.isTrain:
@@ -329,18 +297,10 @@ class PccycleGANModel(BaseModel):
 
                 images_fake_B = self.unnormalize_image(self.fake_B)
                 input_fake_B = self.process_image(images_fake_B)
-                # input_fake_B = self.processor_B(
-                #     images=[img.cpu() for img in images_fake_B],
-                #     return_tensors="pt"
-                #     ).to(self.device)
                 self.embeddings_fake_B = self.netPLIP_B.get_image_features(**input_fake_B)
 
                 images_fake_A = self.unnormalize_image(self.fake_A)
                 input_fake_A = self.process_image(images_fake_A)
-                # input_fake_A = self.processor_A(
-                #     images=[img.cpu() for img in images_fake_A],
-                #     return_tensors="pt"
-                #     ).to(self.device)
                 self.embeddings_fake_A = self.netPLIP_A.get_image_features(**input_fake_A)
 
                 # Add Gaussian noise to fake images
@@ -433,7 +393,6 @@ class PccycleGANModel(BaseModel):
             fake_B, fake_labels = self.fake_B_pool.query(self.fake_B.detach(), self.real_A_class.detach())
             
             # fake labels are the last class in shape [B]
-            # fake_labels = torch.full((fake_B.size(0),), self.num_classes - 1, dtype=torch.long, device=self.device)
             fake_labels = fake_labels.view(-1)
             real_labels = self.real_B_class.view(-1)
             self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B, real_labels, fake_labels)
@@ -446,7 +405,6 @@ class PccycleGANModel(BaseModel):
             fake_A, fake_labels = self.fake_A_pool.query(self.fake_A.detach(), self.real_B_class.detach())
 
             # fake labels are the last class in shape [B]
-            # fake_labels = torch.full((fake_A.size(0),), self.num_classes - 1, dtype=torch.long, device=self.device)
             fake_labels = fake_labels.view(-1)
             real_labels = self.real_A_class.view(-1)
             self.loss_D_B = self.backward_D_basic(self.netD_B, self.real_A, fake_A, real_labels, fake_labels)
@@ -481,13 +439,9 @@ class PccycleGANModel(BaseModel):
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
 
-        # Total variation loss
-        self.loss_tv = self.tv_loss(self.fake_A) + self.tv_loss(self.fake_B)
-
         self.loss_G = (self.loss_G_A + self.loss_G_B +
                        self.loss_cycle_A + self.loss_cycle_B +
-                       self.loss_idt_A + self.loss_idt_B
-                       + self.loss_tv)
+                       self.loss_idt_A + self.loss_idt_B)
 
         # Contrastive loss
         if self.opt.use_clip_contrast:
@@ -554,10 +508,6 @@ class PccycleGANModel(BaseModel):
             self.netPLIP_A.save_pretrained(save_dir_A)
             save_dir_B = os.path.join(self.save_dir, f'{epoch}_net_PLIP_B')
 
-            if not os.path.exists(save_dir_B):
-                os.makedirs(save_dir_B)
-            self.netPLIP_B.save_pretrained(save_dir_B)
-
     def load_networks(self, epoch):
         for name in self.model_names:
             if isinstance(name, str):
@@ -578,7 +528,3 @@ class PccycleGANModel(BaseModel):
             load_dir_A = os.path.join(self.save_dir, f'{epoch}_net_PLIP_A')
             print(f'Loading PLIP_A from {load_dir_A}')
             self.netPLIP_A = CLIPModel.from_pretrained(load_dir_A).to(self.device)
-
-            load_dir_B = os.path.join(self.save_dir, f'{epoch}_net_PLIP_B')
-            print(f'Loading PLIP_B from {load_dir_B}')
-            self.netPLIP_B = CLIPModel.from_pretrained(load_dir_B).to(self.device)
