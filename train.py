@@ -1,13 +1,11 @@
 import time
 import torch
-torch.manual_seed(523)
 from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
 
 import random
-random.seed(523)
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
