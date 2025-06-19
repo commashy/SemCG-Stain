@@ -53,9 +53,6 @@ python test.py \
 Please refer to the paper for more details on the datasets and preprocessing steps.
 Will be updated soon.
 
-### Model Weights
-Will be updated soon.
-
 ## Results
 
 Below shows virtual staining results using SemCG-Stain.
