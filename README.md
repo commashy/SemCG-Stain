@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- # <b></b> Pathology-aware Virtual H\&E Staining of Section-free Thick Tissues with Semantic Contrastive Guidance</div>-->
-# Pathology-aware Virtual H\&E Staining of Section-free Thick Tissues with Semantic Contrastive Guidance</div>
+# [MICCAI 2025] Pathology-aware Virtual H\&E Staining of Section-free Thick Tissues with Semantic Contrastive Guidance</div>
 <!--This is the official repository of "[Progressive Knowledge Distillation for Automatic Perfusion Parameter Maps Generation from Low Temporal Resolution CT Perfusion Images](https://link.springer.com/chapter/10.1007/978-3-031-72117-5_57)," presented at **MICCAI 2024**.
 > **Progressive Knowledge Distillation for Automatic Perfusion Parameter Maps Generation from Low Temporal Resolution CT Perfusion Images** <br>
 > [Moo Hyun (Kyle) Son](mailto:mhson@cse.ust.hk)<sup>1</sup>, [Juyoung (Justin) Bae](mailto:jbaeaa@cse.ust.hk)<sup>1</sup>, [Elizabeth Tong](mailto:etong@stanford.edu)<sup>2</sup>, [Hao Chen](https://www.cse.ust.hk/~haochen/)<sup>1</sup> <br>
